@@ -1,0 +1,10 @@
+[
+  {
+    "Name": "Intel(R) UHD Graphics",
+    "AdapterCompatibility": "Intel Corporation",
+    "VideoProcessor": "Intel(R) UHD Graphics Family",
+    "DriverVersion": "31.0.101.4502",
+    "PNPDeviceID": "PCI\\VEN_8086&DEV_9A49&SUBSYS_220A1043&REV_01\\3&11583659&0&10",
+    "AdapterRAM": 1073741824
+  }
+]

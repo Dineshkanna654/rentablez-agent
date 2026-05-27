@@ -5,6 +5,7 @@ The runner parameter is injectable for testing; production calls powershell via 
 """
 
 import json
+import re
 import subprocess
 from typing import Callable
 
@@ -59,12 +60,22 @@ def _machine(runner: Callable) -> dict:
                "ConvertTo-Json -Compress")
     data = _first_dict(_query(runner, script))
     if not data:
-        return {"vendor": None, "model": None, "system_serial": None, "system_uuid": None}
+        return {
+            "vendor": None, "model": None,
+            "system_serial": None, "system_uuid": None,
+            "serial_number": None, "hardware_uuid": None,
+        }
+    identifying_number = data.get("IdentifyingNumber")
+    uuid = data.get("UUID")
     return {
         "vendor": data.get("Vendor"),
         "model": data.get("Name") or data.get("Version"),
-        "system_serial": data.get("IdentifyingNumber"),
-        "system_uuid": data.get("UUID"),
+        # Windows-flavoured aliases (kept for backward compat)
+        "system_serial": identifying_number,
+        "system_uuid": uuid,
+        # Canonical keys expected by diff.py's SCALAR_SCHEMA["machine"]
+        "serial_number": identifying_number,
+        "hardware_uuid": uuid,
     }
 
 
@@ -128,6 +139,7 @@ def _battery(runner: Callable) -> dict:
         "Select-Object ManufactureName,DeviceName,SerialNumber,"
         "DesignedCapacity,FullChargeCapacity | ConvertTo-Json -Compress"))
     if static:
+        # Note: WMI property is literally "ManufactureName" (no trailing 'r')
         result["manufacturer"] = static.get("ManufactureName")
         result["device_name"] = static.get("DeviceName")
         result["serial"] = static.get("SerialNumber")
@@ -164,6 +176,18 @@ def _displays(runner: Callable) -> list[dict]:
     ]
 
 
+def _parse_vendor_id(pnp_device_id: str | None) -> str | None:
+    """Extract the 4-hex-digit vendor ID from a PCI PNPDeviceID string.
+
+    Example: 'PCI\\VEN_8086&DEV_9A49&...' → '8086'
+    Returns None if the string is absent or the VEN_ segment is not found.
+    """
+    if not pnp_device_id:
+        return None
+    m = re.search(r"VEN_([0-9A-Fa-f]{4})", pnp_device_id)
+    return m.group(1) if m else None
+
+
 def _gpus(runner: Callable) -> list[dict]:
     script = ("Get-CimInstance Win32_VideoController | "
                "Select-Object Name,AdapterCompatibility,VideoProcessor,"
@@ -175,6 +199,8 @@ def _gpus(runner: Callable) -> list[dict]:
             "processor": item.get("VideoProcessor"),
             "driver": item.get("DriverVersion"),
             "device_id": item.get("PNPDeviceID"),
+            # Canonical key expected by diff.py's LIST_SCHEMA["gpus"]
+            "vendor_id": _parse_vendor_id(item.get("PNPDeviceID")),
             "vram": item.get("AdapterRAM"),
         }
         for item in _as_list(_query(runner, script))

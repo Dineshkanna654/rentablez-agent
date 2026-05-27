@@ -23,6 +23,9 @@ def test_machine_fields_extracted():
     assert fp["machine"]["system_serial"] == "C02XK1ABCD12"
     assert fp["machine"]["system_uuid"] == "B8A7F2AA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
     assert fp["machine"]["vendor"] == "Apple Inc."
+    # Canonical keys for diff.py compatibility:
+    assert fp["machine"]["serial_number"] == "C02XK1ABCD12"
+    assert fp["machine"]["hardware_uuid"] == "B8A7F2AA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
 
 
 def test_ram_modules_extracted_with_whitespace_preserved():
@@ -67,3 +70,29 @@ def test_single_item_object_normalized_to_list():
     fp = collect(runner=runner)
     assert len(fp["ram_modules"]) == 1
     assert fp["ram_modules"][0]["serial"] == "Z"
+
+
+def test_gpu_vendor_id_extracted_from_pnp_device_id():
+    gpu_json = (FIXTURES / "windows_gpu.json").read_text()
+    runner = _fake_runner({"Win32_VideoController": gpu_json})
+    fp = collect(runner=runner)
+    assert len(fp["gpus"]) == 1
+    assert fp["gpus"][0]["device_id"] == "PCI\\VEN_8086&DEV_9A49&SUBSYS_220A1043&REV_01\\3&11583659&0&10"
+    assert fp["gpus"][0]["vendor_id"] == "8086"
+    assert fp["gpus"][0]["vendor"] == "Intel Corporation"
+
+
+def test_battery_extracted():
+    basic = (FIXTURES / "windows_battery_basic.json").read_text()
+    static = (FIXTURES / "windows_battery_static.json").read_text()
+    cycles = (FIXTURES / "windows_battery_cycles.json").read_text()
+    runner = _fake_runner({
+        "Win32_Battery": basic,
+        "BatteryStaticData": static,
+        "BatteryCycleCount": cycles,
+    })
+    fp = collect(runner=runner)
+    assert fp["battery"]["serial"] == "BAT-12345"
+    assert fp["battery"]["manufacturer"] == "SMP"
+    assert fp["battery"]["device_name"] == "DELL 5JJDDC4"
+    assert fp["battery"]["cycle_count"] == 87
