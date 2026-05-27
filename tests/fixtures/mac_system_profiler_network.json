@@ -1,0 +1,13 @@
+{
+  "SPNetworkDataType": [
+    {
+      "_name": "Wi-Fi",
+      "interface": "en0",
+      "type": "AirPort",
+      "hardware": "AirPort",
+      "Ethernet": {
+        "MAC Address": "aa:bb:cc:dd:ee:ff"
+      }
+    }
+  ]
+}

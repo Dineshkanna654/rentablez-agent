@@ -1,0 +1,16 @@
+{
+  "SPPowerDataType": [
+    {
+      "sppower_battery_model_info": {
+        "sppower_battery_manufacturer": "Sony",
+        "sppower_battery_device_name": "bq40z451",
+        "sppower_battery_serial_number": "BAT-TEST-001",
+        "sppower_battery_firmware_version": "1.23"
+      },
+      "sppower_battery_health_info": {
+        "sppower_battery_cycle_count": 142,
+        "sppower_battery_health": "Normal"
+      }
+    }
+  ]
+}

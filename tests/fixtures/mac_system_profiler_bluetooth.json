@@ -1,0 +1,11 @@
+{
+  "SPBluetoothDataType": [
+    {
+      "controller_properties": {
+        "controller_address": "11:22:33:44:55:66",
+        "controller_chipset": "Apple H2 (BT 5.3)",
+        "controller_firmwareVersion": "v123"
+      }
+    }
+  ]
+}

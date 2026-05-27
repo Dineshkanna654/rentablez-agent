@@ -26,8 +26,14 @@ def _profile(runner: Callable[[list[str]], str], data_type: str) -> dict:
     try:
         out = runner(["system_profiler", data_type, "-json"])
         return json.loads(out) if out else {}
-    except Exception:
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, ValueError, TypeError):
         return {}
+
+
+def _set_if_unset(d: dict, key: str, value) -> None:
+    """Set d[key] = value only when d[key] is currently None and value is not None."""
+    if d.get(key) is None and value is not None:
+        d[key] = value
 
 
 # ---------------------------------------------------------------------------
@@ -104,14 +110,14 @@ def _battery(runner: Callable) -> dict:
     }
     for entry in entries:
         model_info = entry.get("sppower_battery_model_info") or {}
-        result["manufacturer"] = result["manufacturer"] or model_info.get("sppower_battery_manufacturer")
-        result["device_name"] = result["device_name"] or model_info.get("sppower_battery_device_name")
-        result["serial"] = result["serial"] or model_info.get("sppower_battery_serial_number")
-        result["firmware"] = result["firmware"] or model_info.get("sppower_battery_firmware")
+        _set_if_unset(result, "manufacturer", model_info.get("sppower_battery_manufacturer"))
+        _set_if_unset(result, "device_name", model_info.get("sppower_battery_device_name"))
+        _set_if_unset(result, "serial", model_info.get("sppower_battery_serial_number"))
+        _set_if_unset(result, "firmware", model_info.get("sppower_battery_firmware_version"))
 
         health_info = entry.get("sppower_battery_health_info") or {}
-        result["cycle_count"] = result["cycle_count"] or health_info.get("sppower_battery_cycle_count")
-        result["condition"] = result["condition"] or health_info.get("sppower_battery_health")
+        _set_if_unset(result, "cycle_count", health_info.get("sppower_battery_cycle_count"))
+        _set_if_unset(result, "condition", health_info.get("sppower_battery_health"))
     return result
 
 
