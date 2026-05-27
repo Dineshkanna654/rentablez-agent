@@ -1,0 +1,13 @@
+{
+  "SPHardwareDataType": [
+    {
+      "machine_model": "MacBookPro18,3",
+      "machine_name": "MacBook Pro",
+      "chip_type": "Apple M1 Pro",
+      "number_processors": "8",
+      "physical_memory": "16 GB",
+      "serial_number": "C02XK1ABCD12",
+      "platform_UUID": "B8A7F2AA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+    }
+  ]
+}

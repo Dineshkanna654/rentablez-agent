@@ -1,0 +1,15 @@
+{
+  "SPNVMeDataType": [
+    {
+      "_items": [
+        {
+          "_name": "APPLE SSD AP0512R",
+          "device_model": "APPLE SSD AP0512R",
+          "device_serial": "0ABCDEF12345",
+          "device_revision": "846.100.",
+          "size": "500.28 GB"
+        }
+      ]
+    }
+  ]
+}
