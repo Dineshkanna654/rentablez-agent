@@ -53,10 +53,14 @@ def run_once(
 
     collected_at = now_iso or datetime.now(timezone.utc).isoformat()
 
-    try:
-        current_fp = collector()
-    except Exception as exc:  # noqa: BLE001
-        log.error("Collector failed — skipping this boot run: %s", exc)
+    current_fp = collector()
+
+    if not isinstance(current_fp, dict):
+        log.error("collector returned non-dict (%s); skipping this boot", type(current_fp).__name__)
+        return
+
+    if not current_fp:
+        log.warning("collector returned empty fingerprint; skipping this boot to avoid false SWAPPED")
         return
 
     _atomic_write_json(paths.current_file, current_fp)
@@ -90,7 +94,10 @@ def run_once(
 
     for entry in queue.unsent():
         outcome = sender(cfg.endpoint, cfg.device_token, entry.payload)
-        if outcome in (SendOutcome.SENT, SendOutcome.PERMANENT_FAILURE):
+        if outcome == SendOutcome.SENT:
+            queue.mark_sent(entry.id)
+        elif outcome == SendOutcome.PERMANENT_FAILURE:
+            log.error("backend permanently rejected report id=%s; marking as sent to stop retries", entry.id)
             queue.mark_sent(entry.id)
         else:
             # TRANSIENT_FAILURE: back off, preserve queue order (spec §9.2)

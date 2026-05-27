@@ -186,7 +186,7 @@ def test_baseline_file_corrupted_treated_as_missing(tmp_path):
     assert saved == fp
 
 
-def test_current_json_always_written(tmp_path):
+def test_current_json_written_on_successful_boot(tmp_path):
     fp = _baseline_fp()
     run_once(
         cfg=_cfg(), paths_root=str(tmp_path), os_name="Darwin",
@@ -197,18 +197,65 @@ def test_current_json_always_written(tmp_path):
     assert current == fp
 
 
-def test_collector_exception_does_not_crash(tmp_path):
-    """If the collector itself raises, the agent logs and exits cleanly
+def test_collector_returning_empty_does_not_crash_or_send(tmp_path):
+    """If the collector returns {}, the agent logs and exits cleanly
     without sending anything (per spec §12 error handling)."""
-    def bad_collector():
-        raise RuntimeError("subprocess failed")
-
     sent = []
     run_once(
         cfg=_cfg(), paths_root=str(tmp_path), os_name="Darwin",
-        collector=bad_collector,
+        collector=lambda: {},
         sender=lambda *a: sent.append("would-have-sent") or SendOutcome.SENT,
         os_info={"system": "Darwin"}, now_iso="2026-05-26T10:00:00Z",
     )
     # No report sent
+    assert sent == []
+
+
+def test_current_json_not_overwritten_when_collector_returns_empty(tmp_path):
+    """Empty/failing collector must not overwrite current.json with bad data."""
+    fp = _baseline_fp()
+    # First boot: real fingerprint
+    run_once(
+        cfg=_cfg(), paths_root=str(tmp_path), os_name="Darwin",
+        collector=lambda: fp,
+        sender=lambda *a: SendOutcome.SENT,
+        os_info={"system": "Darwin"}, now_iso="2026-05-26T10:00:00Z",
+    )
+    current_path = tmp_path / "var/lib/rentablez/current.json"
+    assert json.loads(current_path.read_text()) == fp
+
+    # Second boot: collector returns empty dict — current.json should be unchanged
+    run_once(
+        cfg=_cfg(), paths_root=str(tmp_path), os_name="Darwin",
+        collector=lambda: {},
+        sender=lambda *a: SendOutcome.SENT,
+        os_info={"system": "Darwin"}, now_iso="2026-05-27T10:00:00Z",
+    )
+    assert json.loads(current_path.read_text()) == fp  # still the good data
+
+
+def test_empty_collector_on_second_boot_does_not_send_false_swapped(tmp_path):
+    """spec: a collector returning {} after a real baseline must NOT
+    generate a fraudulent SWAPPED report."""
+    fp = _baseline_fp()
+    sent = []
+    def sender(endpoint, token, payload):
+        sent.append(payload)
+        return SendOutcome.SENT
+
+    # Boot 1: real baseline
+    run_once(
+        cfg=_cfg(), paths_root=str(tmp_path), os_name="Darwin",
+        collector=lambda: fp, sender=sender,
+        os_info={"system": "Darwin"}, now_iso="2026-05-26T10:00:00Z",
+    )
+    sent.clear()
+
+    # Boot 2: collector temporarily broken — returns {}
+    run_once(
+        cfg=_cfg(), paths_root=str(tmp_path), os_name="Darwin",
+        collector=lambda: {}, sender=sender,
+        os_info={"system": "Darwin"}, now_iso="2026-05-27T10:00:00Z",
+    )
+    # Critical: NO report sent — we must not have flagged a false SWAPPED
     assert sent == []
