@@ -26,7 +26,8 @@ class Paths:
         ----------
         root:
             Optional prefix prepended to every path segment.  Used in tests
-            to redirect I/O under a temporary directory.
+            to redirect I/O under a temporary directory.  Has no effect on
+            Windows — Windows paths are fixed at ``C:\\ProgramData\\Rentablez``.
         os_name:
             Override the OS detection.  Accepts ``"Darwin"`` or ``"Windows"``.
             If omitted, ``platform.system()`` is called.
@@ -74,6 +75,6 @@ class Paths:
     # ------------------------------------------------------------------
 
     @classmethod
-    def for_current_os(cls) -> "Paths":
+    def for_current_os(cls) -> Paths:
         """Detect the running OS and return a Paths instance for it."""
         return cls()
