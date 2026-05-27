@@ -128,18 +128,22 @@ class Queue:
         # Prune sent entries older than retention window
         cutoff = datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)
         before = len(self._entries)
-        self._entries = [
-            e for e in self._entries
-            if not (
-                e.sent
-                and e.last_attempt_at is not None
-                and datetime.fromisoformat(e.last_attempt_at) < cutoff
-            )
-        ]
+        kept = []
+        for e in self._entries:
+            if e.sent and e.last_attempt_at is not None:
+                try:
+                    ts = datetime.fromisoformat(e.last_attempt_at)
+                    if ts < cutoff:
+                        continue  # prune this entry
+                except (ValueError, TypeError):
+                    pass  # malformed timestamp — keep the entry, treat as not expired
+            kept.append(e)
+        self._entries = kept
         if len(self._entries) != before:
             self._save()
 
     def _save(self) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps([asdict(e) for e in self._entries]))
         os.replace(tmp, self._path)
