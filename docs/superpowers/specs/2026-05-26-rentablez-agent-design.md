@@ -13,7 +13,7 @@ A background agent that runs on every rental laptop (macOS and Windows). On each
 - Detect hardware part swaps with high confidence and specific attribution (which component, old value, new value).
 - Survive offline periods — queue results locally and drain when internet returns.
 - Install once at the warehouse and run untouched for the laptop's entire life across multiple rentals.
-- Ship as a signed, double-clickable installer on both platforms (`.dmg` for Mac, `.exe` for Windows).
+- Ship as plain Python scripts plus a one-shot setup shell/PowerShell script per platform. No installer binaries, no signing, no `.dmg`, no `.exe`.
 
 ## 3. Non-goals (v1)
 
@@ -23,6 +23,7 @@ A background agent that runs on every rental laptop (macOS and Windows). On each
 - No claim / activation flow — the device token is entered manually at install time.
 - No remote command execution, kill switches, or screen locking.
 - No anti-tamper hardening beyond standard OS service permissions.
+- No code signing, no notarization, no installer packaging. The script and setup files are distributed as-is (e.g. internal git repo or shared drive). Warehouse staff run them directly with `sudo` / Administrator.
 
 ## 4. Architecture
 
@@ -54,18 +55,18 @@ A single executable runs as a privileged background service. There is no second 
 
 **macOS:**
 ```
-/Applications/RentablezAgent.app/        (signed bundle, contains binary)
+/usr/local/rentablez/rentablez_agent.py   (the script itself, mode 0755, root:wheel)
 /Library/LaunchDaemons/com.rentablez.agent.plist
-/etc/rentablez/config.json               (mode 0600, root:wheel)
-/var/lib/rentablez/baseline.json         (mode 0600, root:wheel)
-/var/lib/rentablez/current.json          (mode 0600, root:wheel)
-/var/lib/rentablez/queue.json            (mode 0600, root:wheel)
-/var/log/rentablez/agent.log             (mode 0644, root:wheel)
+/etc/rentablez/config.json                (mode 0600, root:wheel)
+/var/lib/rentablez/baseline.json          (mode 0600, root:wheel)
+/var/lib/rentablez/current.json           (mode 0600, root:wheel)
+/var/lib/rentablez/queue.json             (mode 0600, root:wheel)
+/var/log/rentablez/agent.log              (mode 0644, root:wheel)
 ```
 
 **Windows:**
 ```
-C:\Program Files\Rentablez\rentablez-agent.exe   (signed binary)
+C:\Rentablez\rentablez_agent.py                  (the script itself)
 HKLM\System\CurrentControlSet\Services\RentablezAgent  (Windows Service)
 C:\ProgramData\Rentablez\config.json             (ACL: SYSTEM + Administrators only)
 C:\ProgramData\Rentablez\baseline.json
@@ -73,6 +74,8 @@ C:\ProgramData\Rentablez\current.json
 C:\ProgramData\Rentablez\queue.json
 C:\ProgramData\Rentablez\logs\agent.log
 ```
+
+Python interpreter: macOS ships with Python 3 at `/usr/bin/python3`, used directly. Windows: setup script installs Python 3 via `winget install Python.Python.3.12` if not already present, then uses `C:\Python312\python.exe`.
 
 ### 4.3 Identity
 
@@ -268,7 +271,7 @@ When `SWAPPED`, the full current fingerprint is included so ops can see the new 
 }
 ```
 
-Written by the installer. Not modified by the agent at runtime.
+Written by the setup script. Not modified by the agent at runtime.
 
 ### 8.2 `baseline.json`
 
@@ -332,7 +335,8 @@ If the laptop boots without internet, the report sits in `queue.json` indefinite
   <string>com.rentablez.agent</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Applications/RentablezAgent.app/Contents/MacOS/rentablez-agent</string>
+    <string>/usr/bin/python3</string>
+    <string>/usr/local/rentablez/rentablez_agent.py</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
@@ -350,60 +354,102 @@ If the laptop boots without internet, the report sits in `queue.json` indefinite
 
 ### 10.2 Windows — Service
 
-Registered with `sc.exe` during installation:
+Registered with `sc.exe` during setup. Because we're running a Python script (not a native service binary), the service is wrapped with `nssm` (Non-Sucking Service Manager) which is bundled alongside the setup script:
 
 ```
-sc.exe create RentablezAgent ^
-  binPath= "\"C:\Program Files\Rentablez\rentablez-agent.exe\"" ^
-  start= auto ^
-  obj= LocalSystem ^
-  DisplayName= "Rentablez Hardware Monitor"
+nssm.exe install RentablezAgent "C:\Python312\python.exe" "C:\Rentablez\rentablez_agent.py"
+nssm.exe set RentablezAgent Start SERVICE_AUTO_START
+nssm.exe set RentablezAgent ObjectName LocalSystem
+nssm.exe set RentablezAgent DisplayName "Rentablez Hardware Monitor"
+nssm.exe set RentablezAgent AppExit Default Exit
 ```
 
-The service starts at boot, runs the agent to completion, exits. The Service Control Manager handles "started → stopped" cleanly because the agent exits with code 0 on success.
+`AppExit Default Exit` tells nssm: when the script exits 0, leave the service stopped (don't restart it). The Service Control Manager will start it again on the next boot. This gives us the "run once at boot, then exit" behavior with a plain Python script.
 
-## 11. Packaging
+Mac equivalent (`launchd`): no wrapper needed. The plist invokes `/usr/bin/python3 /usr/local/rentablez/rentablez_agent.py` directly, `KeepAlive: false` gives the same one-shot semantics.
 
-### 11.1 Build pipeline
+## 11. Distribution and setup
 
-A single Python codebase. PyInstaller produces:
-- **macOS:** `RentablezAgent.app` bundle → wrapped in `RentablezAgent.dmg`
-- **Windows:** `rentablez-agent.exe` → wrapped in Inno Setup installer `RentablezAgentSetup.exe`
+### 11.1 Repository layout
 
-Build targets run in CI (GitHub Actions: `macos-latest` and `windows-latest` runners).
+A single git repo, distributed internally (private GitHub, shared drive, or USB stick to the warehouse):
 
-### 11.2 Code signing
+```
+rentablez-agent/
+├── rentablez_agent.py          ← the agent itself (runs on every boot)
+├── setup_mac.sh                ← one-shot installer for macOS
+├── setup_windows.ps1           ← one-shot installer for Windows
+├── uninstall_mac.sh
+├── uninstall_windows.ps1
+├── com.rentablez.agent.plist   ← LaunchDaemon template
+├── vendor/
+│   └── nssm.exe                ← bundled for Windows service wrapping
+└── README.md                   ← warehouse runbook
+```
 
-- **macOS:** Signed with Apple Developer ID Application certificate, then notarized via `notarytool`, then stapled. The `.dmg` is also signed.
-- **Windows:** Signed with an EV Code Signing certificate using `signtool.exe`. Both the `.exe` binary and the installer `.exe` are signed. EV cert means no SmartScreen reputation warm-up period.
+### 11.2 Setup script behavior — macOS (`setup_mac.sh`)
 
-Signing happens in CI using secrets from the org's secret manager. Unsigned builds are allowed for local dev but the installer refuses to install them on a fresh machine (checked via `codesign --verify` on Mac, `signtool verify` on Win).
+Run as: `sudo ./setup_mac.sh`
 
-### 11.3 Installer behavior
+1. Verify running as root. If not, abort.
+2. Verify `python3` is available (it is, by default, on every supported macOS version).
+3. Prompt: **"Enter device token (provided by Rentablez):"** — read input, validate against `RTBZ-LAP-\d{5,}`, re-prompt on mismatch.
+4. `mkdir -p /usr/local/rentablez /etc/rentablez /var/lib/rentablez /var/log/rentablez`.
+5. Copy `rentablez_agent.py` to `/usr/local/rentablez/`, `chmod 755`, `chown root:wheel`.
+6. Write `/etc/rentablez/config.json` with the entered token, `chmod 600`, `chown root:wheel`.
+7. Copy the LaunchDaemon plist to `/Library/LaunchDaemons/`, `chmod 644`, `chown root:wheel`.
+8. `launchctl bootstrap system /Library/LaunchDaemons/com.rentablez.agent.plist`.
+9. `launchctl kickstart system/com.rentablez.agent` — runs the agent immediately so the baseline is captured right now, not on next reboot.
+10. Print the device token back to the operator for visual confirmation.
 
-Both installers:
+### 11.3 Setup script behavior — Windows (`setup_windows.ps1`)
 
-1. Show a license / privacy notice that the user must accept.
-2. Prompt: **"Enter device token (provided by Rentablez):"** — required, non-empty, format-validated as `RTBZ-LAP-\d{5,}`.
-3. Copy the binary to the install location.
-4. Write `config.json` with the entered token, mode `0600`.
-5. Create `/var/lib/rentablez/` (or `C:\ProgramData\Rentablez\`) with correct permissions.
-6. Register the LaunchDaemon / Windows Service.
-7. Start the service immediately. This performs the baseline collection right then — the warehouse environment at install time *is* what gets recorded as the baseline. The warehouse manager is responsible for ensuring the laptop is in its final shipped configuration (correct RAM, SSD, etc.) before running the installer.
-8. Show a success screen with the device token echoed back so the warehouse manager can verify they typed it correctly.
+Run as: open PowerShell as Administrator, then `.\setup_windows.ps1`.
 
-Uninstaller: removes binary, service registration, and config — but **leaves `baseline.json` in place** so reinstalling on the same laptop preserves the baseline.
+1. Verify running as Administrator. If not, abort.
+2. Check for Python 3.10+ on `PATH`. If missing, run `winget install -e --id Python.Python.3.12 --silent`.
+3. Prompt: **"Enter device token (provided by Rentablez):"** — validate format, re-prompt on mismatch.
+4. Create directories: `C:\Rentablez`, `C:\ProgramData\Rentablez`, `C:\ProgramData\Rentablez\logs`.
+5. Set NTFS ACLs on `C:\ProgramData\Rentablez` so only `SYSTEM` and `Administrators` can read/write.
+6. Copy `rentablez_agent.py` to `C:\Rentablez\`.
+7. Write `C:\ProgramData\Rentablez\config.json` with the entered token.
+8. Copy bundled `vendor\nssm.exe` to `C:\Rentablez\`.
+9. Run the `nssm install` / `nssm set` block from §10.2 to register the service.
+10. `nssm start RentablezAgent` — runs the agent immediately so the baseline is captured now.
+11. Print the device token back to the operator for visual confirmation.
+
+### 11.4 Operator responsibility
+
+The warehouse manager is responsible for ensuring the laptop is in its final shipped configuration (correct RAM, SSD, battery, display, etc.) **before** running the setup script. The state at setup time *is* the baseline. There is no separate "rebaseline" command — to reset the baseline, the operator deletes `baseline.json` and re-runs the agent.
+
+### 11.5 Uninstall
+
+`sudo ./uninstall_mac.sh` / `.\uninstall_windows.ps1` (as Administrator):
+
+- Stop and unregister the service.
+- Remove the agent script and config.
+- **Leaves `baseline.json` in place** so re-running setup on the same laptop preserves the original baseline.
+
+To fully wipe (e.g. before reselling the laptop): operator additionally deletes `/var/lib/rentablez/` or `C:\ProgramData\Rentablez\`.
+
+### 11.6 Trust model
+
+Without code signing, anything running `rentablez_agent.py` is unverified. The mitigations:
+
+- Distribution channel is internal-only (private repo / direct hand-off). The script never travels over a public download path.
+- File permissions on `/usr/local/rentablez/rentablez_agent.py` and `C:\Rentablez\rentablez_agent.py` are root/Administrator-only writable. A non-admin renter cannot tamper with the script after install.
+- Backend treats every report as untrusted regardless — diff happens server-side too, and `SWAPPED` always triggers human review.
 
 ## 12. Error handling
 
 | Failure | Behavior |
 |---|---|
 | Hardware collection fails (subprocess error) | Log error, skip this boot's report, exit 0. Try again next boot. |
-| `config.json` missing or invalid | Log error, exit 1. No reports sent. Warehouse must reinstall. |
+| `config.json` missing or invalid | Log error, exit 1. No reports sent. Warehouse must re-run setup script. |
 | `baseline.json` corrupted | Treat as missing → recreate from current state, send a new `status: "baseline"` report (so ops sees the reset). |
 | `queue.json` corrupted | Move to `queue.json.broken-<timestamp>`, start fresh. Lost reports are accepted — boot fingerprints are not so precious that we should crash over a corrupt queue. |
 | Network unreachable | Reports stay in queue. No retry within the boot — wait for next boot. |
-| Backend returns 401 | Log it, mark the report as sent (no point retrying a bad token). Token rotation is out of scope for v1; warehouse must reinstall to update the token. |
+| Backend returns 401 | Log it, mark the report as sent (no point retrying a bad token). Token rotation is out of scope for v1; warehouse must re-run setup to update the token. |
 | Clock is wildly wrong (e.g. unset) | Use the timestamp anyway. Backend can flag absurd timestamps. |
 
 All errors are logged to `agent.log` with timestamps. Log file is rotated at 10 MB, keeps 5 generations.
@@ -426,10 +472,11 @@ All errors are logged to `agent.log` with timestamps. Log file is rotated at 10 
 
 ### 13.3 Manual acceptance tests
 
-- Install on a real MacBook from `.dmg`, verify baseline appears in backend.
-- Install on a real Windows laptop from `.exe`, verify baseline appears.
+- Run `setup_mac.sh` on a real MacBook, verify baseline appears in backend and the LaunchDaemon is registered (`launchctl list | grep rentablez`).
+- Run `setup_windows.ps1` on a real Windows laptop, verify baseline appears and the service is registered (`sc query RentablezAgent`).
 - Physically swap RAM in a test laptop, reboot, verify `SWAPPED` report identifies the correct module slot and serial.
 - Disconnect WiFi, reboot, verify queue accumulates; reconnect, reboot, verify drain.
+- Run the uninstall script, verify service is gone and `baseline.json` survives; re-run setup, verify the same baseline is reused.
 
 ## 14. Backend contract (out of scope, documented for completeness)
 
