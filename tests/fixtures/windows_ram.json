@@ -1,0 +1,13 @@
+[
+  {
+    "BankLabel": "BANK 0",
+    "DeviceLocator": "DIMM0",
+    "Manufacturer": "SK Hynix",
+    "PartNumber": "HMA851S6JJR6N-VK   ",
+    "SerialNumber": "4F2A8B   ",
+    "Capacity": 8589934592,
+    "Speed": 3200,
+    "MemoryType": 26,
+    "FormFactor": 12
+  }
+]
