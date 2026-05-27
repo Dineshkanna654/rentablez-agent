@@ -79,7 +79,21 @@ def test_includes_authorization_header():
 
     assert captured["headers"]["Authorization"] == "Bearer MYTOKEN"
     assert captured["headers"]["Content-type"] == "application/json"
+    assert captured["headers"]["User-agent"] == "Rentablez-Agent/1.0"
     assert json.loads(captured["data"]) == {"status": "ok"}
+
+
+def test_uses_post_method():
+    captured = {}
+
+    def fake_urlopen(req, *args, **kwargs):
+        captured["method"] = req.get_method()
+        return _mock_response(200)
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        send("https://x", "T", {})
+
+    assert captured["method"] == "POST"
 
 
 def test_timeout_propagated_to_urlopen():
