@@ -52,6 +52,11 @@ $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRul
     "BUILTIN\Administrators", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")))
 Set-Acl "C:\ProgramData\Rentablez" $acl
 
+if (-not (Test-Path "$ScriptDir\vendor\nssm.exe")) {
+    Write-Error "vendor\nssm.exe is missing. Download nssm 2.24 from https://nssm.cc/release/nssm-2.24.zip, extract win64\nssm.exe to the vendor\ directory, and re-run."
+    exit 1
+}
+
 Write-Host "==> Copying agent files"
 if (Test-Path "C:\Rentablez\rentablez") { Remove-Item -Recurse -Force "C:\Rentablez\rentablez" }
 Copy-Item -Recurse -Force "$ScriptDir\rentablez" "C:\Rentablez\"
@@ -62,7 +67,7 @@ Write-Host "==> Writing config"
 $cfg = [ordered]@{
     device_token = $Token
     endpoint = $Endpoint
-    installed_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+    installed_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 }
 $cfg | ConvertTo-Json | Set-Content -Path "C:\ProgramData\Rentablez\config.json" -Encoding UTF8
 

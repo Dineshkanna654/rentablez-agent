@@ -29,13 +29,19 @@ tail /var/log/rentablez/agent.log
 
 ## Windows install
 
-Open PowerShell as Administrator:
+**Pre-requisite:** `vendor\nssm.exe` must be present. The Windows setup script wraps the Python agent as a Windows Service via nssm (Non-Sucking Service Manager), and the binary is not checked into the repo. Download it once:
+
+1. Get `nssm-2.24.zip` from https://nssm.cc/release/nssm-2.24.zip
+2. Extract `nssm-2.24\win64\nssm.exe`
+3. Copy it to `vendor\nssm.exe` in this repo
+
+Then, open PowerShell as Administrator:
 ```powershell
 cd path\to\rentablez-agent
 .\setup_windows.ps1
 ```
 
-The script installs Python 3.12 via winget if missing, then registers the agent as a Windows Service (wrapped with nssm).
+The script will refuse to proceed if `vendor\nssm.exe` is missing. Otherwise it installs Python 3.12 via winget if missing, then registers the agent as a Windows Service.
 
 Verify:
 ```powershell
@@ -108,3 +114,8 @@ rentablez_agent.py    entrypoint invoked by launchd / nssm
 ```
 
 See `docs/superpowers/specs/2026-05-26-rentablez-agent-design.md` for the design rationale.
+
+## Known issues (v1.0)
+
+- **macOS GPU strong-ID fields may be blank in the baseline** until validated against real `system_profiler SPDisplaysDataType -json` output on a production Mac. If `gpus[*].device_id` and `gpus[*].vendor_id` are `null` in `/var/lib/rentablez/baseline.json`, the SPDisplaysDataType key names in `rentablez/collectors/mac.py` need adjustment. GPU swap detection on macOS will be effectively limited to the `vendor` and `model` strings until this is resolved.
+- **setup_mac.sh is not fully idempotent.** If a previous install was in a stuck state, `launchctl bootstrap` may fail after files have been copied. Recovery: `sudo launchctl bootout system/com.rentablez.agent`, then re-run setup.

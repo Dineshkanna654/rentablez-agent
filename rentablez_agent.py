@@ -41,15 +41,22 @@ def main() -> int:
 
     logger.info("agent starting (token=%s)", cfg.device_token)
 
-    run_once(
-        cfg=cfg,
-        paths_root="",
-        os_name=platform.system(),
-        collector=collect_for_current_os,
-        sender=send,
-        os_info=_os_info(),
-        now_iso=datetime.now(timezone.utc).isoformat(),
-    )
+    try:
+        run_once(
+            cfg=cfg,
+            paths_root="",
+            os_name=platform.system(),
+            collector=collect_for_current_os,
+            sender=send,
+            os_info=_os_info(),
+            now_iso=datetime.now(timezone.utc).isoformat(),
+        )
+    except Exception:
+        # Top-level safety net per spec §12: any uncaught failure must be
+        # logged with traceback, and we exit 0 so launchd/nssm don't flag
+        # the service as crashed. Next boot will retry cleanly.
+        logger.exception("agent run failed with unhandled exception")
+        return 0
 
     logger.info("agent run complete")
     return 0

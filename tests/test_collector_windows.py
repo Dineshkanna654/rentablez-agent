@@ -72,14 +72,46 @@ def test_single_item_object_normalized_to_list():
     assert fp["ram_modules"][0]["serial"] == "Z"
 
 
-def test_gpu_vendor_id_extracted_from_pnp_device_id():
+def test_gpu_vendor_id_and_device_id_extracted_from_pnp_device_id():
     gpu_json = (FIXTURES / "windows_gpu.json").read_text()
     runner = _fake_runner({"Win32_VideoController": gpu_json})
     fp = collect(runner=runner)
     assert len(fp["gpus"]) == 1
-    assert fp["gpus"][0]["device_id"] == "PCI\\VEN_8086&DEV_9A49&SUBSYS_220A1043&REV_01\\3&11583659&0&10"
+    # device_id is the stable VEN:DEV identifier (not the raw PNPDeviceID,
+    # which contains a REV_xx segment that changes on every driver update).
+    assert fp["gpus"][0]["device_id"] == "8086:9A49"
     assert fp["gpus"][0]["vendor_id"] == "8086"
     assert fp["gpus"][0]["vendor"] == "Intel Corporation"
+    # The full PNPDeviceID is still captured for forensics.
+    assert fp["gpus"][0]["pnp_device_id"] == "PCI\\VEN_8086&DEV_9A49&SUBSYS_220A1043&REV_01\\3&11583659&0&10"
+
+
+def test_gpu_device_id_stable_across_driver_revision_bumps():
+    """A Windows Update driver bump changes the REV_xx segment of PNPDeviceID.
+    The collector's device_id must NOT change for the same hardware, or
+    every driver update would generate a false SWAPPED report.
+    """
+    import json as _json
+    rev1 = _json.dumps([{
+        "Name": "Intel(R) UHD Graphics",
+        "AdapterCompatibility": "Intel Corporation",
+        "VideoProcessor": "Intel(R) UHD Graphics Family",
+        "DriverVersion": "31.0.101.4502",
+        "PNPDeviceID": "PCI\\VEN_8086&DEV_9A49&SUBSYS_220A1043&REV_01\\3&11583659&0&10",
+        "AdapterRAM": 1073741824,
+    }])
+    rev2 = _json.dumps([{
+        "Name": "Intel(R) UHD Graphics",
+        "AdapterCompatibility": "Intel Corporation",
+        "VideoProcessor": "Intel(R) UHD Graphics Family",
+        "DriverVersion": "31.0.101.5074",
+        "PNPDeviceID": "PCI\\VEN_8086&DEV_9A49&SUBSYS_220A1043&REV_02\\3&11583659&0&10",
+        "AdapterRAM": 1073741824,
+    }])
+    fp1 = collect(runner=_fake_runner({"Win32_VideoController": rev1}))
+    fp2 = collect(runner=_fake_runner({"Win32_VideoController": rev2}))
+    assert fp1["gpus"][0]["device_id"] == fp2["gpus"][0]["device_id"] == "8086:9A49"
+    assert fp1["gpus"][0]["vendor_id"] == fp2["gpus"][0]["vendor_id"] == "8086"
 
 
 def test_battery_extracted():

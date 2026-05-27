@@ -188,6 +188,26 @@ def _parse_vendor_id(pnp_device_id: str | None) -> str | None:
     return m.group(1) if m else None
 
 
+def _parse_device_id(pnp_device_id: str | None) -> str | None:
+    """Extract a stable vendor:device identifier from a PCI PNPDeviceID.
+
+    The raw PNPDeviceID includes a REV_xx segment that changes when Windows
+    Update pushes a graphics driver — so using the raw string as the GPU
+    identity would generate false SWAPPED reports on every driver bump.
+    Combining VEN_ and DEV_ gives a stable hardware identity.
+
+    Example: 'PCI\\VEN_8086&DEV_9A49&SUBSYS_220A1043&REV_01\\...' → '8086:9A49'
+    Falls back to the raw string when the expected segments are missing.
+    """
+    if not pnp_device_id:
+        return None
+    vm = re.search(r"VEN_([0-9A-Fa-f]{4})", pnp_device_id)
+    dm = re.search(r"DEV_([0-9A-Fa-f]{4})", pnp_device_id)
+    if vm and dm:
+        return f"{vm.group(1).upper()}:{dm.group(1).upper()}"
+    return pnp_device_id
+
+
 def _gpus(runner: Callable) -> list[dict]:
     script = ("Get-CimInstance Win32_VideoController | "
                "Select-Object Name,AdapterCompatibility,VideoProcessor,"
@@ -198,9 +218,10 @@ def _gpus(runner: Callable) -> list[dict]:
             "vendor": item.get("AdapterCompatibility"),
             "processor": item.get("VideoProcessor"),
             "driver": item.get("DriverVersion"),
-            "device_id": item.get("PNPDeviceID"),
+            "device_id": _parse_device_id(item.get("PNPDeviceID")),
             # Canonical key expected by diff.py's LIST_SCHEMA["gpus"]
             "vendor_id": _parse_vendor_id(item.get("PNPDeviceID")),
+            "pnp_device_id": item.get("PNPDeviceID"),
             "vram": item.get("AdapterRAM"),
         }
         for item in _as_list(_query(runner, script))
