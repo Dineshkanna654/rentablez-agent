@@ -502,9 +502,9 @@ Backend responsibilities (not built by the agent team):
 ## 15. Security considerations
 
 - Config and state files are root-only readable. A non-admin renter cannot read or alter the device token, baseline, or queue.
-- The binary is signed; an attacker cannot replace it with a fake without triggering OS-level warnings.
+- The script itself lives in root/Administrator-only locations; a non-admin renter cannot tamper with it. Without code signing, anyone with admin access can replace it — this is an accepted limitation, mitigated by the internal-only distribution channel (see §11.6).
 - Communication is HTTPS-only; certificate validation is on by default (no pinning in v1).
-- The agent collects hardware identifiers, not user data. No filesystem scanning, no keystrokes, no screen capture. This is stated in the privacy notice shown by the installer.
+- The agent collects hardware identifiers, not user data. No filesystem scanning, no keystrokes, no screen capture.
 - An attacker with physical access and root can defeat any local check — this is unavoidable. The defense is the backend-side diff: even if the attacker wipes `baseline.json`, the backend still has the original baseline and will flag the next report as a re-baseline event for ops to review.
 
 ## 16. Out-of-scope items, deferred
