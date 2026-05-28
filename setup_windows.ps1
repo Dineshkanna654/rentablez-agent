@@ -73,8 +73,8 @@ $cfg | ConvertTo-Json | Set-Content -Path "C:\ProgramData\Rentablez\config.json"
 
 Write-Host "==> Registering service via nssm"
 $nssm = "C:\Rentablez\nssm.exe"
-& $nssm stop RentablezAgent 2>$null
-& $nssm remove RentablezAgent confirm 2>$null
+try { & $nssm stop RentablezAgent } catch {}
+try { & $nssm remove RentablezAgent confirm } catch {}
 
 & $nssm install RentablezAgent $PythonPath "C:\Rentablez\rentablez_agent.py"
 & $nssm set RentablezAgent Start SERVICE_AUTO_START
