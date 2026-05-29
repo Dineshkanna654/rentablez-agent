@@ -70,23 +70,20 @@ def run_once(
     if baseline is None:
         _atomic_write_json(paths.baseline_file, current_fp)
         report = build_report(
-            device_token=cfg.device_token, status="baseline",
-            fingerprint=current_fp, os_info=os_info,
-            changes=None, collected_at=collected_at,
+            status="baseline", fingerprint=current_fp,
+            os_info=os_info, changes=None, collected_at=collected_at,
         )
     else:
         changes = diff_fingerprints(baseline, current_fp)
         if changes:
             report = build_report(
-                device_token=cfg.device_token, status="SWAPPED",
-                fingerprint=current_fp, os_info=os_info,
-                changes=changes, collected_at=collected_at,
+                status="SWAPPED", fingerprint=current_fp,
+                os_info=os_info, changes=changes, collected_at=collected_at,
             )
         else:
             report = build_report(
-                device_token=cfg.device_token, status="ok",
-                fingerprint=current_fp, os_info=os_info,
-                changes=None, collected_at=collected_at,
+                status="ok", fingerprint=current_fp,
+                os_info=os_info, changes=None, collected_at=collected_at,
             )
 
     queue = Queue(paths.queue_file)
