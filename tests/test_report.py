@@ -7,14 +7,12 @@ def test_baseline_report_shape():
     fp = {"machine": {"serial_number": "S1"}}
     os_info = {"system": "Darwin", "release": "23.0"}
     r = build_report(
-        device_token="RTBZ-LAP-00042",
         status="baseline",
         fingerprint=fp,
         os_info=os_info,
         changes=None,
         collected_at="2026-05-26T10:00:00Z",
     )
-    assert r["device_token"] == "RTBZ-LAP-00042"
     assert r["agent_version"] == AGENT_VERSION
     assert r["collected_at"] == "2026-05-26T10:00:00Z"
     assert r["status"] == "baseline"
@@ -22,13 +20,13 @@ def test_baseline_report_shape():
     assert r["os"] == os_info
     assert "changes" not in r
     assert "current_fingerprint" not in r
+    assert "device_token" not in r
 
 
 def test_ok_report_shape_omits_fingerprint():
     """spec §7.2: ok reports do NOT include full fingerprint."""
     fp = {"machine": {"serial_number": "S1"}}
     r = build_report(
-        device_token="RTBZ-LAP-00042",
         status="ok",
         fingerprint=fp,
         os_info={"system": "Darwin"},
@@ -47,7 +45,6 @@ def test_swapped_report_includes_changes_and_current_fingerprint():
         Change("ram_modules[0]", "serial", "OLD", "NEW", "value_changed"),
     ]
     r = build_report(
-        device_token="RTBZ-LAP-00042",
         status="SWAPPED",
         fingerprint=fp,
         os_info={"system": "Darwin"},
@@ -69,7 +66,6 @@ def test_swapped_report_includes_changes_and_current_fingerprint():
 def test_invalid_status_raises():
     with pytest.raises(ValueError, match="status"):
         build_report(
-            device_token="x",
             status="weird",
             fingerprint={},
             os_info={},
@@ -81,7 +77,6 @@ def test_invalid_status_raises():
 def test_swapped_requires_changes():
     with pytest.raises(ValueError, match="changes"):
         build_report(
-            device_token="x",
             status="SWAPPED",
             fingerprint={},
             os_info={},

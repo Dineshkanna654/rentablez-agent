@@ -17,9 +17,14 @@ if (Test-Path $nssm) {
 
 Write-Host "==> Removing files (preserving baseline.json)"
 Remove-Item -Recurse -Force "C:\Rentablez" -ErrorAction SilentlyContinue
-Get-ChildItem "C:\ProgramData\Rentablez" -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -ne "baseline.json" } |
-    Remove-Item -Force -Recurse -ErrorAction SilentlyContinue
+
+# Remove logs subdirectory first to avoid ordering errors when iterating recursively
+Remove-Item -Recurse -Force "C:\ProgramData\Rentablez\logs" -ErrorAction SilentlyContinue
+
+# Remove all known state/config files individually — safe, explicit, no ordering issues
+@("config.json", "queue.json", "current.json", "current.json.tmp") | ForEach-Object {
+    Remove-Item -Force "C:\ProgramData\Rentablez\$_" -ErrorAction SilentlyContinue
+}
 
 Write-Host "==> Uninstall complete."
 Write-Host "    Baseline preserved at C:\ProgramData\Rentablez\baseline.json"

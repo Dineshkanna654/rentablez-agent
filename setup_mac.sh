@@ -51,18 +51,13 @@ chmod 600 /etc/rentablez/config.json
 chown root:wheel /etc/rentablez/config.json
 
 echo "==> Installing LaunchDaemon"
-# Remove any prior install under the old label so the new one can take over.
-if [[ -f /Library/LaunchDaemons/com.rentablez.agent.plist ]]; then
-  launchctl bootout system /Library/LaunchDaemons/com.rentablez.agent.plist 2>/dev/null || true
-  rm -f /Library/LaunchDaemons/com.rentablez.agent.plist
-fi
-cp "$SCRIPT_DIR/system.service.plist" /Library/LaunchDaemons/
-chown root:wheel /Library/LaunchDaemons/system.service.plist
-chmod 644 /Library/LaunchDaemons/system.service.plist
+cp "$SCRIPT_DIR/com.rentablez.agent.plist" /Library/LaunchDaemons/
+chown root:wheel /Library/LaunchDaemons/com.rentablez.agent.plist
+chmod 644 /Library/LaunchDaemons/com.rentablez.agent.plist
 
-launchctl bootout system /Library/LaunchDaemons/system.service.plist 2>/dev/null || true
-launchctl bootstrap system /Library/LaunchDaemons/system.service.plist
-launchctl kickstart system/system.service
+launchctl bootout system /Library/LaunchDaemons/com.rentablez.agent.plist 2>/dev/null || true
+launchctl bootstrap system /Library/LaunchDaemons/com.rentablez.agent.plist
+launchctl kickstart system/com.rentablez.agent
 
 echo
 echo "===================================="

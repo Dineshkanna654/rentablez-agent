@@ -9,12 +9,10 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo "==> Stopping LaunchDaemon"
-launchctl bootout system /Library/LaunchDaemons/system.service.plist 2>/dev/null || true
-# Also bootout the legacy label in case an old install is still present.
-launchctl bootout system /Library/LaunchDaemons/com.rentablez.agent.plist 2>/dev/null || true
+# Use the service label — works even if the plist file was already removed
+launchctl bootout system/com.rentablez.agent 2>/dev/null || true
 
 echo "==> Removing files (preserving baseline.json)"
-rm -f /Library/LaunchDaemons/system.service.plist
 rm -f /Library/LaunchDaemons/com.rentablez.agent.plist
 rm -rf /usr/local/rentablez
 rm -rf /etc/rentablez

@@ -15,7 +15,6 @@ _VALID_STATUSES = {"baseline", "ok", "SWAPPED"}
 
 def build_report(
     *,
-    device_token: str,
     status: str,
     fingerprint: dict,
     os_info: dict,
@@ -30,7 +29,6 @@ def build_report(
         raise ValueError("changes must be a non-empty list when status is 'SWAPPED'")
 
     report = {
-        "device_token": device_token,
         "agent_version": AGENT_VERSION,
         "collected_at": collected_at,
         "status": status,
