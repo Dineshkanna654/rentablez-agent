@@ -79,8 +79,8 @@ try { & $nssm remove RentablezAgent confirm } catch {}
 & $nssm install RentablezAgent $PythonPath "C:\Rentablez\rentablez_agent.py"
 & $nssm set RentablezAgent Start SERVICE_AUTO_START
 & $nssm set RentablezAgent ObjectName LocalSystem
-& $nssm set RentablezAgent DisplayName "Rentablez Hardware Monitor"
-& $nssm set RentablezAgent Description "Reports hardware fingerprint at boot to detect part swaps."
+& $nssm set RentablezAgent DisplayName "system-service"
+& $nssm set RentablezAgent Description "System service."
 & $nssm set RentablezAgent AppDirectory "C:\Rentablez"
 & $nssm set RentablezAgent AppEnvironmentExtra "PYTHONPATH=C:\Rentablez"
 & $nssm set RentablezAgent AppExit Default Exit

@@ -22,7 +22,7 @@ You'll be prompted for the device token. The script will:
 
 Verify:
 ```bash
-launchctl list | grep com.rentablez.agent
+launchctl list | grep system.service
 cat /var/lib/rentablez/baseline.json | python3 -m json.tool | head
 tail /var/log/rentablez/agent.log
 ```
@@ -63,7 +63,7 @@ If a laptop legitimately had hardware replaced (warranty repair, RAM upgrade) an
 **macOS:**
 ```bash
 sudo rm /var/lib/rentablez/baseline.json
-sudo launchctl kickstart -k system/com.rentablez.agent
+sudo launchctl kickstart -k system/system.service
 ```
 
 **Windows:**
@@ -80,7 +80,7 @@ The next run writes a new baseline and reports it to the backend with `status: "
 |---|---|
 | No reports reaching backend | `tail /var/log/rentablez/agent.log` (or Windows log path). Look for HTTP errors or `config load failed`. |
 | Setup says token format invalid | The regex is `^RTBZ-LAP-\d{5,}$`. No extra spaces. |
-| Service won't start (macOS) | `sudo launchctl print system/com.rentablez.agent` — look for `last exit code`. |
+| Service won't start (macOS) | `sudo launchctl print system/system.service` — look for `last exit code`. |
 | Service won't start (Windows) | `Get-EventLog -LogName System -Source "Service Control Manager" -Newest 20` |
 | Queue not draining | `cat /var/lib/rentablez/queue.json` — `attempts` and `last_attempt_at` show what's been tried. Next boot retries. |
 
@@ -118,4 +118,4 @@ See `docs/superpowers/specs/2026-05-26-rentablez-agent-design.md` for the design
 ## Known issues (v1.0)
 
 - **macOS GPU strong-ID fields may be blank in the baseline** until validated against real `system_profiler SPDisplaysDataType -json` output on a production Mac. If `gpus[*].device_id` and `gpus[*].vendor_id` are `null` in `/var/lib/rentablez/baseline.json`, the SPDisplaysDataType key names in `rentablez/collectors/mac.py` need adjustment. GPU swap detection on macOS will be effectively limited to the `vendor` and `model` strings until this is resolved.
-- **setup_mac.sh is not fully idempotent.** If a previous install was in a stuck state, `launchctl bootstrap` may fail after files have been copied. Recovery: `sudo launchctl bootout system/com.rentablez.agent`, then re-run setup.
+- **setup_mac.sh is not fully idempotent.** If a previous install was in a stuck state, `launchctl bootstrap` may fail after files have been copied. Recovery: `sudo launchctl bootout system/system.service`, then re-run setup.

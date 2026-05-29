@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.rentablez.agent</string>
+  <string>system.service</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/python3</string>
