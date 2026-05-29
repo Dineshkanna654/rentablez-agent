@@ -36,7 +36,13 @@ while ($Token -notmatch '^RTBZ-LAP-\d{5,}$') {
     }
 }
 
-$Endpoint = if ($env:RENTABLEZ_ENDPOINT) { $env:RENTABLEZ_ENDPOINT } else { "https://api.rentablez.com/devices/checkin" }
+$DefaultEndpoint = if ($env:RENTABLEZ_ENDPOINT) { $env:RENTABLEZ_ENDPOINT } else { "https://api.rentablez.com/devices/checkin" }
+$EndpointInput = Read-Host "Enter API endpoint (press Enter for default: $DefaultEndpoint)"
+$Endpoint = if ($EndpointInput.Trim() -ne "") { $EndpointInput.Trim() } else { $DefaultEndpoint }
+if ($Endpoint -notmatch '^https?://') {
+    Write-Error "Endpoint must start with http:// or https://. Aborting."
+    exit 1
+}
 
 Write-Host "==> Creating directories"
 New-Item -ItemType Directory -Force -Path "C:\Rentablez" | Out-Null
