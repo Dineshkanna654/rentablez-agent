@@ -16,10 +16,10 @@ fi
 SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 TOKEN=""
-while [[ ! "$TOKEN" =~ ^RTBZ-LAP-[0-9]{5,}$ ]]; do
-  read -rp "Enter device token (e.g. RTBZ-LAP-00042): " TOKEN
-  if [[ ! "$TOKEN" =~ ^RTBZ-LAP-[0-9]{5,}$ ]]; then
-    echo "  Invalid format. Must look like RTBZ-LAP-<5+ digits>."
+while [[ -z "$TOKEN" ]]; do
+  read -rp "Enter device token (e.g. CHEA-MAC-BOOK-0010): " TOKEN
+  if [[ -z "$TOKEN" ]]; then
+    echo "  Token cannot be empty."
   fi
 done
 
